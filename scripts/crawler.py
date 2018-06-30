@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 from bs4 import BeautifulSoup as bs
+from pprint import pprint
 import numpy as np
 import logging, logging.config
 import requests, re, csv
 
-logging.config.fileConfig("logging.conf")
+logging.config.fileConfig("crawlerlog.conf")
 log = logging.getLogger("root")
 
 url = "https://www.plurk.com/p/mtxvw5"
@@ -26,6 +27,15 @@ def writeCsv(header, Dict, fileName, path='../results/'):
             Mean = np.mean(array)
             Std = np.std(array)
             csvWriter.writerow([Key, High, Low, Medium, UQ, LQ, Counts, Mean, Std])
+    log.info("***Finished Writing***")
+
+def writeRaw(header, rawLst, fileName, path='../results/'):
+    log.info("-------In Raw Data Writing-------")
+    with open(path+fileName, 'a', newline='') as csvFile:
+        csvWriter = csv.writer(csvFile)
+        csvWriter.writerow(header)
+        for row in rawLst:
+            csvWriter.writerow(row)
     log.info("***Finished Writing***")
 
 def replyFormat(reply):
@@ -102,6 +112,14 @@ def makeSenLst(srcLst):
     senLst = [makeSeniority(src[-2]) for src in srcLst if makeSeniority(src[-2]) != None]
     return clean(senLst)
 
+def makeRawFormat(srclst):
+    age = makeDigit(srclst[0])
+    city = srclst[2][:2]
+    sen = makeSeniority(srclst[-2])
+    salary = convertSalary(srclst[-1])
+    rawLst = [age, city, sen, salary]
+    return [0 if raw == None else raw for raw in rawLst]
+
 def buildAgeTable(srcLst):
     log.info("--------In BuildAgeTable--------")
     # Note: srcLst would be each column of the reply content from the src website
@@ -157,6 +175,18 @@ def buildSeniorityTable(srcLst):
     log.info("start to write the results")
     writeCsv(header, cleanSingle(senDct), fileName)
 
+def buildRawTable(srcLst):
+    # Note: srcLst would be each column of the reply content from the src website
+    # the format would be: ['36歲', '私立高職畢業', '台北', '印前美工', '年資8年', '40K']
+    log.info("-------In BuildRawTable-------")
+    header = ['Age', 'City', 'Seniority', 'Salary']
+    fileName = "rawTable.csv"
+    log.debug("Start to build rawLst")
+    rawLst = [makeRawFormat(src) for src in srcLst]
+    log.debug("Finished rawLst building,\n{}".format(rawLst))
+    log.info("start to write the raws")
+    writeRaw(header, rawLst, fileName)
+
 def crawler():
     log.info("-------Starting Crawler------")
     plurkHtml = requests.get(url)
@@ -177,6 +207,7 @@ def main():
     buildAgeTable(srcLst)
     buildCityTable(srcLst)
     buildSeniorityTable(srcLst)
+    buildRawTable(srcLst)
 
 if __name__=="__main__":
     main()
